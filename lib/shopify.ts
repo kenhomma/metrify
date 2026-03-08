@@ -7,5 +7,5 @@ export const shopify = shopifyApi({
   scopes: process.env.SHOPIFY_SCOPES!.split(','),
   hostName: new URL(process.env.APP_URL!).hostname,
   apiVersion: ApiVersion.January24,
-  isEmbeddedApp: false,
+  isEmbeddedApp: true,
 });

@@ -16,7 +16,8 @@ export async function GET(request: NextRequest) {
   }
 
   const state = crypto.randomBytes(16).toString('hex');
-  const redirectUri = `${process.env.APP_URL}/api/auth/callback`;
+  const appUrl = process.env.APP_URL!.replace(/\/$/, '');
+  const redirectUri = `${appUrl}/api/auth/callback`;
   const scopes = process.env.SHOPIFY_SCOPES;
   const apiKey = process.env.SHOPIFY_API_KEY;
 
