@@ -157,9 +157,10 @@ export default function DashboardPage() {
                 width={56}
               />
               <Tooltip
-                formatter={(value: number | string) =>
-                  [`${Number(value).toLocaleString('en-US', { minimumFractionDigits: 2 })} ${salesCurrency}`, '売上'] as [string, string]
-                }
+                formatter={(value: number | string) => {
+                  const num = typeof value === 'string' ? parseFloat(value) : value
+                  return [num.toLocaleString('en-US', { minimumFractionDigits: 2 }), '売上']
+                }}
                 labelFormatter={(label) => `日付: ${label}`}
               />
               <Line
