@@ -1,25 +1,23 @@
 import { NextResponse } from 'next/server';
-import { getIronSession } from 'iron-session';
-import { cookies } from 'next/headers';
 import { sql } from '@/lib/db';
-import { sessionOptions, SessionData } from '@/lib/session';
+import { getSessionShop } from '@/lib/session';
 
 export async function GET() {
-  const session = await getIronSession<SessionData>(await cookies(), sessionOptions);
+  const shop = await getSessionShop();
 
-  if (!session.shop) {
+  if (!shop) {
     return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
   }
 
   const merchants = await sql`
-    SELECT shop_domain, access_token FROM merchants WHERE shop_domain = ${session.shop} LIMIT 1
+    SELECT shop_domain, access_token FROM merchants WHERE shop_domain = ${shop} LIMIT 1
   `;
 
   if (merchants.length === 0) {
     return NextResponse.json({ error: 'Merchant not found' }, { status: 404 });
   }
 
-  const { shop_domain, access_token } = merchants[0];
+  const { shop_domain, access_token } = merchants[0] as { shop_domain: string; access_token: string };
   const token = access_token.trim();
 
   const query = `

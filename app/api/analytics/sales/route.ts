@@ -1,8 +1,6 @@
 import { NextResponse } from 'next/server';
-import { getIronSession } from 'iron-session';
-import { cookies } from 'next/headers';
 import { sql } from '@/lib/db';
-import { sessionOptions, SessionData } from '@/lib/session';
+import { getSessionShop } from '@/lib/session';
 
 type OrderNode = {
   totalPriceSet: { shopMoney: { amount: string; currencyCode: string } };
@@ -10,9 +8,9 @@ type OrderNode = {
 };
 
 export async function GET(request: Request) {
-  const session = await getIronSession<SessionData>(await cookies(), sessionOptions);
+  const shop = await getSessionShop();
 
-  if (!session.shop) {
+  if (!shop) {
     return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
   }
 
@@ -20,7 +18,7 @@ export async function GET(request: Request) {
   const period = searchParams.get('period') ?? 'daily';
 
   const merchants = await sql`
-    SELECT shop_domain, access_token FROM merchants WHERE shop_domain = ${session.shop} LIMIT 1
+    SELECT shop_domain, access_token FROM merchants WHERE shop_domain = ${shop} LIMIT 1
   `;
 
   if (merchants.length === 0) {
