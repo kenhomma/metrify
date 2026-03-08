@@ -1,6 +1,7 @@
 'use client';
 
-import { useEffect, useState } from 'react';
+import { Suspense, useEffect, useState } from 'react';
+import { useSearchParams, useRouter } from 'next/navigation';
 import {
   LineChart,
   Line,
@@ -23,8 +24,6 @@ const CustomTooltip = ({ active, payload, label }: any) => {
   return null
 }
 
-const SHOP = 'metrify-test.myshopify.com';
-
 type OrderNode = {
   id: string;
   name: string;
@@ -36,7 +35,11 @@ type OrderNode = {
 
 type SalesPoint = { date: string; sales: number };
 
-export default function DashboardPage() {
+function DashboardContent() {
+  const searchParams = useSearchParams();
+  const router = useRouter();
+  const shop = searchParams.get('shop');
+
   const [orders, setOrders] = useState<OrderNode[]>([]);
   const [salesData, setSalesData] = useState<SalesPoint[]>([]);
   const [salesCurrency, setSalesCurrency] = useState('USD');
@@ -47,7 +50,12 @@ export default function DashboardPage() {
   const [salesLoading, setSalesLoading] = useState(true);
 
   useEffect(() => {
-    fetch(`/api/orders?shop=${SHOP}`)
+    if (!shop) {
+      router.replace('/');
+      return;
+    }
+
+    fetch(`/api/orders?shop=${shop}`)
       .then((res) => res.json())
       .then((data) => {
         if (data.error) setOrdersError(data.error);
@@ -55,12 +63,14 @@ export default function DashboardPage() {
       })
       .catch(() => setOrdersError('注文データの取得に失敗しました'))
       .finally(() => setOrdersLoading(false));
-  }, []);
+  }, [shop, router]);
 
   useEffect(() => {
+    if (!shop) return;
+
     setSalesLoading(true);
     setSalesError(null);
-    fetch(`/api/analytics/sales?shop=${SHOP}&period=${period}`)
+    fetch(`/api/analytics/sales?shop=${shop}&period=${period}`)
       .then((res) => res.json())
       .then((res) => {
         if (res.error) setSalesError(res.error);
@@ -71,7 +81,7 @@ export default function DashboardPage() {
       })
       .catch(() => setSalesError('グラフデータの取得に失敗しました'))
       .finally(() => setSalesLoading(false));
-  }, [period]);
+  }, [shop, period]);
 
   const totalRevenue = orders.reduce(
     (sum, o) => sum + parseFloat(o.totalPriceSet.shopMoney.amount),
@@ -85,9 +95,12 @@ export default function DashboardPage() {
     return `${m}/${d}`;
   };
 
+  if (!shop) return null;
+
   return (
     <div className="min-h-screen bg-gray-50 p-8">
       <h1 className="text-2xl font-bold text-gray-800 mb-6">ダッシュボード</h1>
+      <p className="text-sm text-gray-500 mb-6">{shop}</p>
 
       {/* サマリーカード */}
       <div className="grid grid-cols-2 gap-4 mb-8 max-w-lg">
@@ -234,6 +247,14 @@ export default function DashboardPage() {
         )}
       </div>
     </div>
+  );
+}
+
+export default function DashboardPage() {
+  return (
+    <Suspense fallback={<div className="flex items-center justify-center min-h-screen text-gray-400">読み込み中...</div>}>
+      <DashboardContent />
+    </Suspense>
   );
 }
 
