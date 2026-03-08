@@ -1,7 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server';
 import crypto from 'crypto';
 import { getIronSession } from 'iron-session';
-import { cookies } from 'next/headers';
 import { sql } from '@/lib/db';
 import { sessionOptions, SessionData } from '@/lib/session';
 
@@ -82,14 +81,15 @@ export async function GET(request: NextRequest) {
     return NextResponse.json({ error: 'Failed to save merchant' }, { status: 500 });
   }
 
-  // 5. Issue session cookie
-  const session = await getIronSession<SessionData>(await cookies(), sessionOptions);
+  // 5. Redirect to dashboard, clear state cookie
+  const appUrl = process.env.APP_URL!.replace(/\/$/, '');
+  const response = NextResponse.redirect(`${appUrl}/dashboard`);
+  response.cookies.delete('shopify_oauth_state');
+
+  // 6. Issue session cookie ON the redirect response
+  const session = await getIronSession<SessionData>(request, response, sessionOptions);
   session.shop = shop;
   await session.save();
-
-  // 6. Redirect to dashboard, clear state cookie
-  const response = NextResponse.redirect(`${process.env.APP_URL}/dashboard?shop=${shop}`);
-  response.cookies.delete('shopify_oauth_state');
 
   return response;
 }
