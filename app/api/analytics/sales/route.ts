@@ -1,5 +1,8 @@
-import { sql } from '@/lib/db';
 import { NextResponse } from 'next/server';
+import { getIronSession } from 'iron-session';
+import { cookies } from 'next/headers';
+import { sql } from '@/lib/db';
+import { sessionOptions, SessionData } from '@/lib/session';
 
 type OrderNode = {
   totalPriceSet: { shopMoney: { amount: string; currencyCode: string } };
@@ -7,16 +10,17 @@ type OrderNode = {
 };
 
 export async function GET(request: Request) {
-  const { searchParams } = new URL(request.url);
-  const shop = searchParams.get('shop');
-  const period = searchParams.get('period') ?? 'daily';
+  const session = await getIronSession<SessionData>(await cookies(), sessionOptions);
 
-  if (!shop) {
-    return NextResponse.json({ error: 'shop parameter is required' }, { status: 400 });
+  if (!session.shop) {
+    return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
   }
 
+  const { searchParams } = new URL(request.url);
+  const period = searchParams.get('period') ?? 'daily';
+
   const merchants = await sql`
-    SELECT shop_domain, access_token FROM merchants WHERE shop_domain = ${shop} LIMIT 1
+    SELECT shop_domain, access_token FROM merchants WHERE shop_domain = ${session.shop} LIMIT 1
   `;
 
   if (merchants.length === 0) {
@@ -73,7 +77,6 @@ export async function GET(request: Request) {
     (e: { node: OrderNode }) => e.node
   );
 
-  // Aggregate by period
   const aggregated: Record<string, number> = {};
 
   for (const order of orders) {
@@ -85,7 +88,6 @@ export async function GET(request: Request) {
     aggregated[key] = (aggregated[key] ?? 0) + parseFloat(order.totalPriceSet.shopMoney.amount);
   }
 
-  // Build full date range with 0-fills
   const result: { date: string; sales: number }[] = [];
 
   if (period === 'monthly') {

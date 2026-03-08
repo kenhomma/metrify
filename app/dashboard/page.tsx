@@ -1,7 +1,6 @@
 'use client';
 
-import { Suspense, useEffect, useState } from 'react';
-import { useSearchParams, useRouter } from 'next/navigation';
+import { useEffect, useState } from 'react';
 import {
   LineChart,
   Line,
@@ -35,11 +34,8 @@ type OrderNode = {
 
 type SalesPoint = { date: string; sales: number };
 
-function DashboardContent() {
-  const searchParams = useSearchParams();
-  const router = useRouter();
-  const shop = searchParams.get('shop');
-
+export default function DashboardPage() {
+  const [shop, setShop] = useState<string | null>(null);
   const [orders, setOrders] = useState<OrderNode[]>([]);
   const [salesData, setSalesData] = useState<SalesPoint[]>([]);
   const [salesCurrency, setSalesCurrency] = useState('USD');
@@ -49,13 +45,19 @@ function DashboardContent() {
   const [ordersLoading, setOrdersLoading] = useState(true);
   const [salesLoading, setSalesLoading] = useState(true);
 
+  // セッションからshopを取得
   useEffect(() => {
-    if (!shop) {
-      router.replace('/');
-      return;
-    }
+    fetch('/api/session')
+      .then((res) => res.json())
+      .then((data) => {
+        if (data.shop) setShop(data.shop);
+      })
+      .catch(() => {});
+  }, []);
 
-    fetch(`/api/orders?shop=${shop}`)
+  // 注文データ取得
+  useEffect(() => {
+    fetch('/api/orders')
       .then((res) => res.json())
       .then((data) => {
         if (data.error) setOrdersError(data.error);
@@ -63,14 +65,13 @@ function DashboardContent() {
       })
       .catch(() => setOrdersError('注文データの取得に失敗しました'))
       .finally(() => setOrdersLoading(false));
-  }, [shop, router]);
+  }, []);
 
+  // 売上グラフデータ取得
   useEffect(() => {
-    if (!shop) return;
-
     setSalesLoading(true);
     setSalesError(null);
-    fetch(`/api/analytics/sales?shop=${shop}&period=${period}`)
+    fetch(`/api/analytics/sales?period=${period}`)
       .then((res) => res.json())
       .then((res) => {
         if (res.error) setSalesError(res.error);
@@ -81,7 +82,7 @@ function DashboardContent() {
       })
       .catch(() => setSalesError('グラフデータの取得に失敗しました'))
       .finally(() => setSalesLoading(false));
-  }, [shop, period]);
+  }, [period]);
 
   const totalRevenue = orders.reduce(
     (sum, o) => sum + parseFloat(o.totalPriceSet.shopMoney.amount),
@@ -95,12 +96,12 @@ function DashboardContent() {
     return `${m}/${d}`;
   };
 
-  if (!shop) return null;
-
   return (
     <div className="min-h-screen bg-gray-50 p-8">
-      <h1 className="text-2xl font-bold text-gray-800 mb-6">ダッシュボード</h1>
-      <p className="text-sm text-gray-500 mb-6">{shop}</p>
+      <div className="mb-6">
+        <h1 className="text-2xl font-bold text-gray-800">ダッシュボード</h1>
+        {shop && <p className="text-sm text-gray-500 mt-1">{shop}</p>}
+      </div>
 
       {/* サマリーカード */}
       <div className="grid grid-cols-2 gap-4 mb-8 max-w-lg">
@@ -247,14 +248,6 @@ function DashboardContent() {
         )}
       </div>
     </div>
-  );
-}
-
-export default function DashboardPage() {
-  return (
-    <Suspense fallback={<div className="flex items-center justify-center min-h-screen text-gray-400">読み込み中...</div>}>
-      <DashboardContent />
-    </Suspense>
   );
 }
 

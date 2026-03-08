@@ -17,12 +17,6 @@ export async function middleware(request: NextRequest) {
     return NextResponse.redirect(new URL('/', request.url));
   }
 
-  // shopパラメータがセッションと不一致 → 403
-  const shopParam = searchParams.get('shop');
-  if (shopParam && shopParam !== session.shop) {
-    return new NextResponse('Forbidden', { status: 403 });
-  }
-
   return response;
 }
 

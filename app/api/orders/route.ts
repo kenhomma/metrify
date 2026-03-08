@@ -1,16 +1,18 @@
-import { sql } from '@/lib/db';
 import { NextResponse } from 'next/server';
+import { getIronSession } from 'iron-session';
+import { cookies } from 'next/headers';
+import { sql } from '@/lib/db';
+import { sessionOptions, SessionData } from '@/lib/session';
 
-export async function GET(request: Request) {
-  const { searchParams } = new URL(request.url);
-  const shop = searchParams.get('shop');
+export async function GET() {
+  const session = await getIronSession<SessionData>(await cookies(), sessionOptions);
 
-  if (!shop) {
-    return NextResponse.json({ error: 'shop parameter is required' }, { status: 400 });
+  if (!session.shop) {
+    return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
   }
 
   const merchants = await sql`
-    SELECT shop_domain, access_token FROM merchants WHERE shop_domain = ${shop} LIMIT 1
+    SELECT shop_domain, access_token FROM merchants WHERE shop_domain = ${session.shop} LIMIT 1
   `;
 
   if (merchants.length === 0) {
@@ -52,11 +54,7 @@ export async function GET(request: Request) {
   if (!res.ok) {
     const body = await res.json().catch(() => null);
     return NextResponse.json(
-      {
-        error: 'Shopify API error',
-        status: res.status,
-        shopify: body,
-      },
+      { error: 'Shopify API error', status: res.status, shopify: body },
       { status: res.status }
     );
   }
