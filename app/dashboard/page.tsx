@@ -11,6 +11,18 @@ import {
   ResponsiveContainer,
 } from 'recharts';
 
+const CustomTooltip = ({ active, payload, label }: any) => {
+  if (active && payload && payload.length) {
+    return (
+      <div className="bg-white p-2 border rounded shadow">
+        <p>{`日付: ${label}`}</p>
+        <p>{`売上: ${Number(payload[0].value).toLocaleString()} USD`}</p>
+      </div>
+    )
+  }
+  return null
+}
+
 const SHOP = 'metrify-test.myshopify.com';
 
 type OrderNode = {
@@ -156,13 +168,7 @@ export default function DashboardPage() {
                 tickFormatter={(v) => `${v}`}
                 width={56}
               />
-              <Tooltip
-                formatter={(value: number | string) => {
-                  const num = typeof value === 'string' ? parseFloat(value) : value
-                  return [num.toLocaleString('en-US', { minimumFractionDigits: 2 }), '売上']
-                }}
-                labelFormatter={(label) => `日付: ${label}`}
-              />
+              <Tooltip content={<CustomTooltip />} />
               <Line
                 type="monotone"
                 dataKey="sales"
