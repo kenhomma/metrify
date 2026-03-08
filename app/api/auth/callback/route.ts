@@ -1,8 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server';
 import crypto from 'crypto';
-import { sealData } from 'iron-session';
 import { sql } from '@/lib/db';
-import { SESSION_COOKIE_NAME, SEAL_OPTIONS, COOKIE_OPTIONS } from '@/lib/session';
+import { SESSION_COOKIE_NAME, COOKIE_OPTIONS, createSessionValue } from '@/lib/session';
 
 function verifyHmac(searchParams: URLSearchParams, secret: string): boolean {
   const hmac = searchParams.get('hmac');
@@ -81,12 +80,10 @@ export async function GET(request: NextRequest) {
     return NextResponse.json({ error: 'Failed to save merchant' }, { status: 500 });
   }
 
-  // 5. Seal session data and set cookie on redirect response
+  // 5. Set session cookie on redirect response
   const appUrl = process.env.APP_URL!.replace(/\/$/, '');
-  const sealed = await sealData({ shop }, SEAL_OPTIONS);
-
   const response = NextResponse.redirect(`${appUrl}/dashboard`);
-  response.cookies.set(SESSION_COOKIE_NAME, sealed, COOKIE_OPTIONS);
+  response.cookies.set(SESSION_COOKIE_NAME, createSessionValue(shop), COOKIE_OPTIONS);
   response.cookies.delete('shopify_oauth_state');
 
   return response;
