@@ -1,6 +1,7 @@
 'use client';
 
 import { useEffect, useState } from 'react';
+import { useRouter } from 'next/navigation';
 import {
   LineChart,
   Line,
@@ -35,6 +36,7 @@ type OrderNode = {
 type SalesPoint = { date: string; sales: number };
 
 export default function DashboardPage() {
+  const router = useRouter();
   const [shop, setShop] = useState<string | null>(null);
   const [orders, setOrders] = useState<OrderNode[]>([]);
   const [salesData, setSalesData] = useState<SalesPoint[]>([]);
@@ -45,15 +47,21 @@ export default function DashboardPage() {
   const [ordersLoading, setOrdersLoading] = useState(true);
   const [salesLoading, setSalesLoading] = useState(true);
 
-  // セッションからshopを取得
+  // セッションからshopを取得。未認証なら / へリダイレクト
   useEffect(() => {
     fetch('/api/session')
-      .then((res) => res.json())
-      .then((data) => {
-        if (data.shop) setShop(data.shop);
+      .then((res) => {
+        if (res.status === 401) {
+          router.replace('/');
+          return null;
+        }
+        return res.json();
       })
-      .catch(() => {});
-  }, []);
+      .then((data) => {
+        if (data?.shop) setShop(data.shop);
+      })
+      .catch(() => router.replace('/'));
+  }, [router]);
 
   // 注文データ取得
   useEffect(() => {
