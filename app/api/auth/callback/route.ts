@@ -80,9 +80,9 @@ export async function GET(request: NextRequest) {
     return NextResponse.json({ error: 'Failed to save merchant' }, { status: 500 });
   }
 
-  // 5. Set session cookie on redirect response
+  // 5. Redirect to dashboard with shop parameter
   const appUrl = process.env.APP_URL!.replace(/\/$/, '');
-  const response = NextResponse.redirect(`${appUrl}/dashboard`);
+  const response = NextResponse.redirect(`${appUrl}/dashboard?shop=${encodeURIComponent(shop)}`);
   response.cookies.set(SESSION_COOKIE_NAME, createSessionValue(shop), COOKIE_OPTIONS);
   response.cookies.delete('shopify_oauth_state');
 

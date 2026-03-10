@@ -1,12 +1,11 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { sql } from '@/lib/db';
-import { getAuthenticatedShop } from '@/lib/session';
 
 export async function GET(request: NextRequest) {
-  const shop = await getAuthenticatedShop(request);
+  const shop = request.nextUrl.searchParams.get('shop');
 
   if (!shop) {
-    return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
+    return NextResponse.json({ error: 'Missing shop parameter' }, { status: 400 });
   }
 
   const merchants = await sql`
@@ -14,7 +13,7 @@ export async function GET(request: NextRequest) {
   `;
 
   if (merchants.length === 0) {
-    return NextResponse.json({ error: 'Merchant not found' }, { status: 404 });
+    return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
   }
 
   const { shop_domain, access_token } = merchants[0] as { shop_domain: string; access_token: string };

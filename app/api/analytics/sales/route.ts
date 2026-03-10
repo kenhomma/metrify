@@ -1,6 +1,5 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { sql } from '@/lib/db';
-import { getAuthenticatedShop } from '@/lib/session';
 
 type OrderNode = {
   totalPriceSet: { shopMoney: { amount: string; currencyCode: string } };
@@ -8,21 +7,20 @@ type OrderNode = {
 };
 
 export async function GET(request: NextRequest) {
-  const shop = await getAuthenticatedShop(request);
+  const shop = request.nextUrl.searchParams.get('shop');
 
   if (!shop) {
-    return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
+    return NextResponse.json({ error: 'Missing shop parameter' }, { status: 400 });
   }
 
-  const { searchParams } = new URL(request.url);
-  const period = searchParams.get('period') ?? 'daily';
+  const period = request.nextUrl.searchParams.get('period') ?? 'daily';
 
   const merchants = await sql`
     SELECT shop_domain, access_token FROM merchants WHERE shop_domain = ${shop} LIMIT 1
   `;
 
   if (merchants.length === 0) {
-    return NextResponse.json({ error: 'Merchant not found' }, { status: 404 });
+    return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
   }
 
   const { shop_domain, access_token } = merchants[0];
