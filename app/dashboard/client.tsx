@@ -8,6 +8,7 @@ import {
   YAxis,
   CartesianGrid,
   Tooltip,
+  Legend,
   ResponsiveContainer,
 } from 'recharts';
 
@@ -34,7 +35,29 @@ type OrderNode = {
 
 type SalesPoint = { date: string; sales: number };
 
-export default function DashboardClient({ shop }: { shop: string }) {
+type GAData = {
+  traffic: { date: string; pageViews: number; sessions: number; users: number }[];
+  channels: { channel: string; sessions: number; users: number }[];
+  ecommerce: { date: string; purchases: number; revenue: number }[];
+  totals: {
+    pageViews: number;
+    sessions: number;
+    users: number;
+    revenue: number;
+    purchases: number;
+    conversionRate: number;
+  };
+};
+
+export default function DashboardClient({
+  shop,
+  gaConnected,
+  ga4PropertyId,
+}: {
+  shop: string;
+  gaConnected: boolean;
+  ga4PropertyId: string | null;
+}) {
   const [orders, setOrders] = useState<OrderNode[]>([]);
   const [salesData, setSalesData] = useState<SalesPoint[]>([]);
   const [salesCurrency, setSalesCurrency] = useState('USD');
@@ -43,6 +66,14 @@ export default function DashboardClient({ shop }: { shop: string }) {
   const [salesError, setSalesError] = useState<string | null>(null);
   const [ordersLoading, setOrdersLoading] = useState(true);
   const [salesLoading, setSalesLoading] = useState(true);
+
+  // GA4 state
+  const [gaData, setGaData] = useState<GAData | null>(null);
+  const [gaLoading, setGaLoading] = useState(false);
+  const [gaError, setGaError] = useState<string | null>(null);
+  const [propertyIdInput, setPropertyIdInput] = useState(ga4PropertyId?.replace('properties/', '') ?? '');
+  const [showPropertyForm, setShowPropertyForm] = useState(!ga4PropertyId && gaConnected);
+  const [propertySaving, setPropertySaving] = useState(false);
 
   // 注文データ取得
   useEffect(() => {
@@ -73,6 +104,21 @@ export default function DashboardClient({ shop }: { shop: string }) {
       .finally(() => setSalesLoading(false));
   }, [shop, period]);
 
+  // GA4データ取得
+  useEffect(() => {
+    if (!gaConnected || !ga4PropertyId) return;
+    setGaLoading(true);
+    setGaError(null);
+    fetch(`/api/ga/data?shop=${encodeURIComponent(shop)}`)
+      .then((res) => res.json())
+      .then((data) => {
+        if (data.error) setGaError(data.error);
+        else setGaData(data);
+      })
+      .catch(() => setGaError('GA4データの取得に失敗しました'))
+      .finally(() => setGaLoading(false));
+  }, [shop, gaConnected, ga4PropertyId]);
+
   const totalRevenue = orders.reduce(
     (sum, o) => sum + parseFloat(o.totalPriceSet.shopMoney.amount),
     0
@@ -85,6 +131,37 @@ export default function DashboardClient({ shop }: { shop: string }) {
     return `${m}/${d}`;
   };
 
+  const handleConnectGA4 = () => {
+    const w = 600;
+    const h = 700;
+    const left = window.screenX + (window.outerWidth - w) / 2;
+    const top = window.screenY + (window.outerHeight - h) / 2;
+    window.open(
+      `/api/ga/auth?shop=${encodeURIComponent(shop)}`,
+      'ga4-oauth',
+      `width=${w},height=${h},left=${left},top=${top}`
+    );
+  };
+
+  const handleSavePropertyId = async () => {
+    if (!propertyIdInput.trim()) return;
+    setPropertySaving(true);
+    try {
+      const res = await fetch(`/api/ga/property?shop=${encodeURIComponent(shop)}`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ propertyId: propertyIdInput.trim() }),
+      });
+      if (res.ok) {
+        window.location.reload();
+      }
+    } catch {
+      // ignore
+    } finally {
+      setPropertySaving(false);
+    }
+  };
+
   return (
     <div className="min-h-screen bg-gray-50 p-8">
       <div className="mb-6">
@@ -92,7 +169,7 @@ export default function DashboardClient({ shop }: { shop: string }) {
         <p className="text-sm text-gray-500 mt-1">{shop}</p>
       </div>
 
-      {/* サマリーカード */}
+      {/* Shopify サマリーカード */}
       <div className="grid grid-cols-2 gap-4 mb-8 max-w-lg">
         <div className="bg-white rounded-xl shadow-sm border border-gray-200 p-6">
           <p className="text-sm text-gray-500 mb-1">売上合計</p>
@@ -186,7 +263,7 @@ export default function DashboardClient({ shop }: { shop: string }) {
       </div>
 
       {/* 注文一覧テーブル */}
-      <div className="bg-white rounded-xl shadow-sm border border-gray-200 overflow-hidden">
+      <div className="bg-white rounded-xl shadow-sm border border-gray-200 overflow-hidden mb-8">
         <div className="px-6 py-4 border-b border-gray-200">
           <h2 className="text-base font-semibold text-gray-700">注文一覧</h2>
         </div>
@@ -234,6 +311,162 @@ export default function DashboardClient({ shop }: { shop: string }) {
               })}
             </tbody>
           </table>
+        )}
+      </div>
+
+      {/* ========== GA4セクション ========== */}
+      <div className="border-t border-gray-200 pt-8 mt-4">
+        <h2 className="text-xl font-bold text-gray-800 mb-6">Google Analytics</h2>
+
+        {/* GA4未接続 */}
+        {!gaConnected && (
+          <div className="bg-white rounded-xl shadow-sm border border-gray-200 p-6">
+            <p className="text-sm text-gray-500 mb-4">
+              GA4アカウントを接続して、トラフィックやコンバージョンデータを表示します。
+            </p>
+            <button
+              onClick={handleConnectGA4}
+              className="px-4 py-2 bg-blue-600 text-white rounded-lg text-sm font-medium hover:bg-blue-700 transition-colors"
+            >
+              GA4アカウントを接続
+            </button>
+          </div>
+        )}
+
+        {/* プロパティID入力 */}
+        {gaConnected && showPropertyForm && (
+          <div className="bg-white rounded-xl shadow-sm border border-gray-200 p-6">
+            <p className="text-sm text-gray-500 mb-4">
+              GA4のプロパティIDを入力してください（GA4管理画面 → プロパティ設定で確認できます）
+            </p>
+            <div className="flex gap-2 max-w-md">
+              <input
+                type="text"
+                value={propertyIdInput}
+                onChange={(e) => setPropertyIdInput(e.target.value)}
+                placeholder="123456789"
+                className="flex-1 px-3 py-2 border border-gray-300 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
+              />
+              <button
+                onClick={handleSavePropertyId}
+                disabled={propertySaving}
+                className="px-4 py-2 bg-blue-600 text-white rounded-lg text-sm font-medium hover:bg-blue-700 transition-colors disabled:opacity-50"
+              >
+                {propertySaving ? '保存中...' : '保存'}
+              </button>
+            </div>
+          </div>
+        )}
+
+        {/* GA4ローディング */}
+        {gaConnected && ga4PropertyId && gaLoading && (
+          <p className="text-gray-400 text-sm">GA4データを読み込み中...</p>
+        )}
+
+        {/* GA4エラー */}
+        {gaConnected && ga4PropertyId && gaError && (
+          <div className="bg-white rounded-xl shadow-sm border border-red-200 p-6">
+            <p className="text-red-500 text-sm">{gaError}</p>
+          </div>
+        )}
+
+        {/* GA4データ表示 */}
+        {gaData && (
+          <>
+            {/* トラフィックサマリー */}
+            <div className="grid grid-cols-3 gap-4 mb-8 max-w-2xl">
+              <div className="bg-white rounded-xl shadow-sm border border-gray-200 p-6">
+                <p className="text-sm text-gray-500 mb-1">ページビュー</p>
+                <p className="text-2xl font-bold text-gray-800">
+                  {gaData.totals.pageViews.toLocaleString()}
+                </p>
+              </div>
+              <div className="bg-white rounded-xl shadow-sm border border-gray-200 p-6">
+                <p className="text-sm text-gray-500 mb-1">セッション</p>
+                <p className="text-2xl font-bold text-gray-800">
+                  {gaData.totals.sessions.toLocaleString()}
+                </p>
+              </div>
+              <div className="bg-white rounded-xl shadow-sm border border-gray-200 p-6">
+                <p className="text-sm text-gray-500 mb-1">ユーザー</p>
+                <p className="text-2xl font-bold text-gray-800">
+                  {gaData.totals.users.toLocaleString()}
+                </p>
+              </div>
+            </div>
+
+            {/* トラフィック推移グラフ */}
+            <div className="bg-white rounded-xl shadow-sm border border-gray-200 p-6 mb-8">
+              <h3 className="text-base font-semibold text-gray-700 mb-4">
+                トラフィック推移（過去30日）
+              </h3>
+              <ResponsiveContainer width="100%" height={260}>
+                <LineChart data={gaData.traffic} margin={{ top: 4, right: 16, left: 0, bottom: 0 }}>
+                  <CartesianGrid strokeDasharray="3 3" stroke="#f0f0f0" />
+                  <XAxis
+                    dataKey="date"
+                    tickFormatter={(d) => d.slice(5)}
+                    tick={{ fontSize: 12, fill: '#9ca3af' }}
+                    interval={4}
+                  />
+                  <YAxis tick={{ fontSize: 12, fill: '#9ca3af' }} width={56} />
+                  <Tooltip />
+                  <Legend />
+                  <Line type="monotone" dataKey="pageViews" stroke="#2563eb" strokeWidth={2} dot={false} name="PV" />
+                  <Line type="monotone" dataKey="sessions" stroke="#16a34a" strokeWidth={2} dot={false} name="セッション" />
+                  <Line type="monotone" dataKey="users" stroke="#d97706" strokeWidth={2} dot={false} name="ユーザー" />
+                </LineChart>
+              </ResponsiveContainer>
+            </div>
+
+            {/* チャネル別テーブル */}
+            <div className="bg-white rounded-xl shadow-sm border border-gray-200 overflow-hidden mb-8">
+              <div className="px-6 py-4 border-b border-gray-200">
+                <h3 className="text-base font-semibold text-gray-700">チャネル別トラフィック</h3>
+              </div>
+              <table className="w-full text-sm">
+                <thead className="bg-gray-50 text-gray-500 uppercase text-xs">
+                  <tr>
+                    <th className="px-6 py-3 text-left font-medium">チャネル</th>
+                    <th className="px-6 py-3 text-right font-medium">セッション</th>
+                    <th className="px-6 py-3 text-right font-medium">ユーザー</th>
+                  </tr>
+                </thead>
+                <tbody className="divide-y divide-gray-100">
+                  {gaData.channels.map((ch) => (
+                    <tr key={ch.channel} className="hover:bg-gray-50 transition-colors">
+                      <td className="px-6 py-4 font-medium text-gray-800">{ch.channel}</td>
+                      <td className="px-6 py-4 text-right text-gray-700">{ch.sessions.toLocaleString()}</td>
+                      <td className="px-6 py-4 text-right text-gray-700">{ch.users.toLocaleString()}</td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
+
+            {/* eコマースサマリー */}
+            <div className="grid grid-cols-3 gap-4 mb-8 max-w-2xl">
+              <div className="bg-white rounded-xl shadow-sm border border-gray-200 p-6">
+                <p className="text-sm text-gray-500 mb-1">GA4売上</p>
+                <p className="text-2xl font-bold text-gray-800">
+                  {gaData.totals.revenue.toLocaleString('en-US', { minimumFractionDigits: 2 })}
+                </p>
+              </div>
+              <div className="bg-white rounded-xl shadow-sm border border-gray-200 p-6">
+                <p className="text-sm text-gray-500 mb-1">購入件数</p>
+                <p className="text-2xl font-bold text-gray-800">
+                  {gaData.totals.purchases.toLocaleString()}
+                </p>
+              </div>
+              <div className="bg-white rounded-xl shadow-sm border border-gray-200 p-6">
+                <p className="text-sm text-gray-500 mb-1">コンバージョン率</p>
+                <p className="text-2xl font-bold text-gray-800">
+                  {gaData.totals.conversionRate}
+                  <span className="text-base font-normal text-gray-500">%</span>
+                </p>
+              </div>
+            </div>
+          </>
         )}
       </div>
     </div>
