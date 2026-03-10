@@ -1,5 +1,6 @@
 import crypto from 'crypto';
 import { cookies } from 'next/headers';
+import { getShopFromToken } from './verify-session-token';
 
 export const SESSION_COOKIE_NAME = 'metrify_session';
 
@@ -48,4 +49,15 @@ export async function getSessionShop(): Promise<string | null> {
   } catch {
     return null;
   }
+}
+
+export async function getAuthenticatedShop(request: Request): Promise<string | null> {
+  const authHeader = request.headers.get('Authorization');
+  if (authHeader?.startsWith('Bearer ')) {
+    const token = authHeader.slice(7);
+    const shop = getShopFromToken(token);
+    if (shop) return shop;
+  }
+
+  return getSessionShop();
 }

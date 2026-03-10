@@ -1,6 +1,6 @@
 'use client';
 
-import { useEffect, useState } from 'react';
+import { useEffect, useState, useCallback } from 'react';
 import { useRouter } from 'next/navigation';
 import {
   LineChart,
@@ -11,6 +11,23 @@ import {
   Tooltip,
   ResponsiveContainer,
 } from 'recharts';
+
+declare global {
+  interface Window {
+    shopify?: { idToken: () => Promise<string> };
+  }
+}
+
+async function authFetch(url: string, init?: RequestInit): Promise<Response> {
+  const headers = new Headers(init?.headers);
+  if (window.shopify) {
+    try {
+      const token = await window.shopify.idToken();
+      if (token) headers.set('Authorization', `Bearer ${token}`);
+    } catch {}
+  }
+  return fetch(url, { ...init, headers });
+}
 
 const CustomTooltip = ({ active, payload, label }: any) => {
   if (active && payload && payload.length) {
@@ -49,9 +66,9 @@ export default function DashboardPage() {
 
   const [sessionChecked, setSessionChecked] = useState(false);
 
-  // セッションからshopを取得。未認証なら / へリダイレクト
+  // セッションからshopを取得。未認証ならOAuth開始
   useEffect(() => {
-    fetch('/api/session')
+    authFetch('/api/session')
       .then((res) => {
         if (res.status === 401) {
           router.replace('/');
@@ -70,7 +87,8 @@ export default function DashboardPage() {
 
   // 注文データ取得
   useEffect(() => {
-    fetch('/api/orders')
+    if (!sessionChecked) return;
+    authFetch('/api/orders')
       .then((res) => res.json())
       .then((data) => {
         if (data.error) setOrdersError(data.error);
@@ -78,13 +96,14 @@ export default function DashboardPage() {
       })
       .catch(() => setOrdersError('注文データの取得に失敗しました'))
       .finally(() => setOrdersLoading(false));
-  }, []);
+  }, [sessionChecked]);
 
   // 売上グラフデータ取得
   useEffect(() => {
+    if (!sessionChecked) return;
     setSalesLoading(true);
     setSalesError(null);
-    fetch(`/api/analytics/sales?period=${period}`)
+    authFetch(`/api/analytics/sales?period=${period}`)
       .then((res) => res.json())
       .then((res) => {
         if (res.error) setSalesError(res.error);
@@ -95,7 +114,7 @@ export default function DashboardPage() {
       })
       .catch(() => setSalesError('グラフデータの取得に失敗しました'))
       .finally(() => setSalesLoading(false));
-  }, [period]);
+  }, [sessionChecked, period]);
 
   const totalRevenue = orders.reduce(
     (sum, o) => sum + parseFloat(o.totalPriceSet.shopMoney.amount),
