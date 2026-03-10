@@ -31,8 +31,8 @@ export async function GET(request: NextRequest) {
   const response = NextResponse.redirect(authUrl);
   response.cookies.set('shopify_oauth_state', state, {
     httpOnly: true,
-    secure: process.env.NODE_ENV === 'production',
-    sameSite: 'lax',
+    secure: true,
+    sameSite: 'none',
     maxAge: 60 * 10, // 10 minutes
     path: '/',
   });

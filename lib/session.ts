@@ -5,8 +5,8 @@ export const SESSION_COOKIE_NAME = 'metrify_session';
 
 export const COOKIE_OPTIONS = {
   httpOnly: true,
-  secure: process.env.NODE_ENV === 'production',
-  sameSite: 'lax' as const,
+  secure: true,
+  sameSite: 'none' as const,
   path: '/',
   maxAge: 60 * 60 * 24 * 30,
 };

@@ -47,6 +47,8 @@ export default function DashboardPage() {
   const [ordersLoading, setOrdersLoading] = useState(true);
   const [salesLoading, setSalesLoading] = useState(true);
 
+  const [sessionChecked, setSessionChecked] = useState(false);
+
   // セッションからshopを取得。未認証なら / へリダイレクト
   useEffect(() => {
     fetch('/api/session')
@@ -58,7 +60,10 @@ export default function DashboardPage() {
         return res.json();
       })
       .then((data) => {
-        if (data?.shop) setShop(data.shop);
+        if (data?.shop) {
+          setShop(data.shop);
+          setSessionChecked(true);
+        }
       })
       .catch(() => router.replace('/'));
   }, [router]);
@@ -103,6 +108,14 @@ export default function DashboardPage() {
     const [, m, d] = date.split('-');
     return `${m}/${d}`;
   };
+
+  if (!sessionChecked) {
+    return (
+      <div className="min-h-screen bg-gray-50 flex items-center justify-center">
+        <p className="text-gray-400">読み込み中...</p>
+      </div>
+    );
+  }
 
   return (
     <div className="min-h-screen bg-gray-50 p-8">
