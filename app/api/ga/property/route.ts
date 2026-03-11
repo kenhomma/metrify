@@ -48,3 +48,18 @@ export async function POST(request: NextRequest) {
 
   return NextResponse.json({ ok: true, propertyId: normalizedId });
 }
+
+export async function DELETE(request: NextRequest) {
+  const shop = request.nextUrl.searchParams.get('shop');
+  if (!shop) {
+    return NextResponse.json({ error: 'Missing shop parameter' }, { status: 400 });
+  }
+
+  await sql`
+    UPDATE merchants
+    SET google_refresh_token = NULL, ga4_property_id = NULL
+    WHERE shop_domain = ${shop}
+  `;
+
+  return NextResponse.json({ ok: true });
+}
