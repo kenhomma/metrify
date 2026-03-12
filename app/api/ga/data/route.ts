@@ -50,9 +50,16 @@ export async function GET(request: NextRequest) {
     );
   }
 
+  const periodParam = request.nextUrl.searchParams.get('period') ?? 'daily';
+  const isMonthly = periodParam === 'monthly';
+
   const endDate = new Date().toISOString().split('T')[0];
   const startDateObj = new Date();
-  startDateObj.setDate(startDateObj.getDate() - 30);
+  if (isMonthly) {
+    startDateObj.setMonth(startDateObj.getMonth() - 12);
+  } else {
+    startDateObj.setDate(startDateObj.getDate() - 30);
+  }
   const startDate = startDateObj.toISOString().split('T')[0];
 
   const [trafficResult, channelResult, ecommerceResult] = await Promise.all([
@@ -121,19 +128,44 @@ export async function GET(request: NextRequest) {
       }))
     : [];
 
-  const totalPV = traffic.reduce((s: number, r: any) => s + r.pageViews, 0);
-  const totalSessions = traffic.reduce((s: number, r: any) => s + r.sessions, 0);
-  const totalUsers = traffic.reduce((s: number, r: any) => s + r.users, 0);
-  const totalRevenue = ecommerce.reduce((s: number, r: any) => s + r.revenue, 0);
-  const totalPurchases = ecommerce.reduce((s: number, r: any) => s + r.purchases, 0);
+  // 月次集計
+  const aggregateMonthly = (
+    data: { date: string; [key: string]: any }[],
+    sumKeys: string[]
+  ) => {
+    const map: Record<string, any> = {};
+    for (const row of data) {
+      const month = row.date.slice(0, 7);
+      if (!map[month]) {
+        map[month] = { date: month };
+        for (const k of sumKeys) map[month][k] = 0;
+      }
+      for (const k of sumKeys) map[month][k] += row[k];
+    }
+    return Object.values(map).sort((a: any, b: any) => a.date.localeCompare(b.date));
+  };
+
+  const finalTraffic = isMonthly
+    ? aggregateMonthly(traffic, ['pageViews', 'sessions', 'users'])
+    : traffic;
+
+  const finalEcommerce = isMonthly
+    ? aggregateMonthly(ecommerce, ['purchases', 'revenue'])
+    : ecommerce;
+
+  const totalPV = finalTraffic.reduce((s: number, r: any) => s + r.pageViews, 0);
+  const totalSessions = finalTraffic.reduce((s: number, r: any) => s + r.sessions, 0);
+  const totalUsers = finalTraffic.reduce((s: number, r: any) => s + r.users, 0);
+  const totalRevenue = finalEcommerce.reduce((s: number, r: any) => s + r.revenue, 0);
+  const totalPurchases = finalEcommerce.reduce((s: number, r: any) => s + r.purchases, 0);
   const conversionRate = totalSessions > 0
     ? Math.round((totalPurchases / totalSessions) * 10000) / 100
     : 0;
 
   return NextResponse.json({
-    traffic,
+    traffic: finalTraffic,
     channels,
-    ecommerce,
+    ecommerce: finalEcommerce,
     totals: {
       pageViews: totalPV,
       sessions: totalSessions,
