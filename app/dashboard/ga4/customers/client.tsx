@@ -18,6 +18,7 @@ import DashboardGrid from '../../components/DashboardGrid';
 import PeriodSelector from '../../components/PeriodSelector';
 import SummaryCard from '../../components/SummaryCard';
 import GA4SettingsPanel from '../../components/GA4SettingsPanel';
+import { useAuthFetch } from '@/lib/use-auth-fetch';
 
 type CustomerData = {
   newVsReturning: { type: string; sessions: number; users: number }[];
@@ -74,11 +75,12 @@ export default function CustomersClient({
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [period, setPeriod] = useState<'daily' | 'monthly'>('daily');
+  const authFetch = useAuthFetch();
 
   useEffect(() => {
     setLoading(true);
     setError(null);
-    fetch(`/api/ga/data/customers?shop=${encodeURIComponent(shop)}&period=${period}`)
+    authFetch(`/api/ga/data/customers?shop=${encodeURIComponent(shop)}&period=${period}`)
       .then((res) => res.json())
       .then((d) => {
         if (d.error) setError(d.error);
@@ -86,7 +88,7 @@ export default function CustomersClient({
       })
       .catch((err) => setError(`データの取得に失敗しました: ${err.message}`))
       .finally(() => setLoading(false));
-  }, [shop, period]);
+  }, [shop, period, authFetch]);
 
   const pieData = data?.newVsReturning.map((r) => ({
     name: typeLabels[r.type] ?? r.type,

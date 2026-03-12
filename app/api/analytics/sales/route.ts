@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { sql } from '@/lib/db';
+import { authenticateRequest } from '@/lib/auth';
 
 type OrderNode = {
   totalPriceSet: { shopMoney: { amount: string; currencyCode: string } };
@@ -7,11 +8,9 @@ type OrderNode = {
 };
 
 export async function GET(request: NextRequest) {
-  const shop = request.nextUrl.searchParams.get('shop');
-
-  if (!shop) {
-    return NextResponse.json({ error: 'Missing shop parameter' }, { status: 400 });
-  }
+  const auth = authenticateRequest(request);
+  if ('error' in auth) return auth.error;
+  const { shop } = auth;
 
   const period = request.nextUrl.searchParams.get('period') ?? 'daily';
 

@@ -1,6 +1,7 @@
 'use client';
 
 import { useState } from 'react';
+import { useAuthFetch } from '@/lib/use-auth-fetch';
 
 export default function GA4SettingsPanel({
   shop,
@@ -15,6 +16,7 @@ export default function GA4SettingsPanel({
   const [propertySaving, setPropertySaving] = useState(false);
   const [disconnecting, setDisconnecting] = useState(false);
   const [showSettings, setShowSettings] = useState(false);
+  const authFetch = useAuthFetch();
 
   const handleConnectGA4 = () => {
     const w = 600;
@@ -32,7 +34,7 @@ export default function GA4SettingsPanel({
     if (!propertyIdInput.trim()) return;
     setPropertySaving(true);
     try {
-      const res = await fetch(
+      const res = await authFetch(
         `/api/ga/property?shop=${encodeURIComponent(shop)}`,
         {
           method: 'POST',
@@ -52,7 +54,7 @@ export default function GA4SettingsPanel({
     if (!confirm('GA4接続を解除しますか？')) return;
     setDisconnecting(true);
     try {
-      const res = await fetch(
+      const res = await authFetch(
         `/api/ga/property?shop=${encodeURIComponent(shop)}`,
         { method: 'DELETE' }
       );

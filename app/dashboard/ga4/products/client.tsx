@@ -14,6 +14,7 @@ import DashboardGrid from '../../components/DashboardGrid';
 import PeriodSelector from '../../components/PeriodSelector';
 import SummaryCard from '../../components/SummaryCard';
 import GA4SettingsPanel from '../../components/GA4SettingsPanel';
+import { useAuthFetch } from '@/lib/use-auth-fetch';
 
 type Product = {
   name: string;
@@ -67,11 +68,12 @@ export default function ProductsClient({
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [period, setPeriod] = useState<'daily' | 'monthly'>('daily');
+  const authFetch = useAuthFetch();
 
   useEffect(() => {
     setLoading(true);
     setError(null);
-    fetch(`/api/ga/data/products?shop=${encodeURIComponent(shop)}&period=${period}`)
+    authFetch(`/api/ga/data/products?shop=${encodeURIComponent(shop)}&period=${period}`)
       .then((res) => res.json())
       .then((d) => {
         if (d.error) setError(d.error);
@@ -79,7 +81,7 @@ export default function ProductsClient({
       })
       .catch((err) => setError(`データの取得に失敗しました: ${err.message}`))
       .finally(() => setLoading(false));
-  }, [shop, period]);
+  }, [shop, period, authFetch]);
 
   const top10 = data?.products.slice(0, 10) ?? [];
 

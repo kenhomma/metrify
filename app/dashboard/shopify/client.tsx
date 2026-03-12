@@ -13,6 +13,7 @@ import {
 import DashboardGrid from '../components/DashboardGrid';
 import PeriodSelector from '../components/PeriodSelector';
 import SummaryCard from '../components/SummaryCard';
+import { useAuthFetch } from '@/lib/use-auth-fetch';
 
 type OrderNode = {
   id: string;
@@ -67,9 +68,10 @@ export default function ShopifyClient({ shop }: { shop: string }) {
   const [salesError, setSalesError] = useState<string | null>(null);
   const [ordersLoading, setOrdersLoading] = useState(true);
   const [salesLoading, setSalesLoading] = useState(true);
+  const authFetch = useAuthFetch();
 
   useEffect(() => {
-    fetch(`/api/orders?shop=${encodeURIComponent(shop)}`)
+    authFetch(`/api/orders?shop=${encodeURIComponent(shop)}`)
       .then((res) => res.json())
       .then((data) => {
         if (data.error) setOrdersError(data.error);
@@ -77,12 +79,12 @@ export default function ShopifyClient({ shop }: { shop: string }) {
       })
       .catch(() => setOrdersError('注文データの取得に失敗しました'))
       .finally(() => setOrdersLoading(false));
-  }, [shop]);
+  }, [shop, authFetch]);
 
   useEffect(() => {
     setSalesLoading(true);
     setSalesError(null);
-    fetch(`/api/analytics/sales?shop=${encodeURIComponent(shop)}&period=${period}`)
+    authFetch(`/api/analytics/sales?shop=${encodeURIComponent(shop)}&period=${period}`)
       .then((res) => res.json())
       .then((res) => {
         if (res.error) setSalesError(res.error);
@@ -93,7 +95,7 @@ export default function ShopifyClient({ shop }: { shop: string }) {
       })
       .catch(() => setSalesError('グラフデータの取得に失敗しました'))
       .finally(() => setSalesLoading(false));
-  }, [shop, period]);
+  }, [shop, period, authFetch]);
 
   const totalRevenue = orders.reduce(
     (sum, o) => sum + parseFloat(o.totalPriceSet.shopMoney.amount),

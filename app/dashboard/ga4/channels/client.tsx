@@ -15,6 +15,7 @@ import DashboardGrid from '../../components/DashboardGrid';
 import PeriodSelector from '../../components/PeriodSelector';
 import SummaryCard from '../../components/SummaryCard';
 import GA4SettingsPanel from '../../components/GA4SettingsPanel';
+import { useAuthFetch } from '@/lib/use-auth-fetch';
 
 type GAData = {
   traffic: { date: string; pageViews: number; sessions: number; users: number }[];
@@ -74,11 +75,12 @@ export default function ChannelsClient({
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [period, setPeriod] = useState<'daily' | 'monthly'>('daily');
+  const authFetch = useAuthFetch();
 
   useEffect(() => {
     setLoading(true);
     setError(null);
-    fetch(`/api/ga/data?shop=${encodeURIComponent(shop)}&period=${period}`)
+    authFetch(`/api/ga/data?shop=${encodeURIComponent(shop)}&period=${period}`)
       .then((res) => res.json())
       .then((data) => {
         if (data.error) setError(data.error);
@@ -86,7 +88,7 @@ export default function ChannelsClient({
       })
       .catch((err) => setError(`GA4データの取得に失敗しました: ${err.message}`))
       .finally(() => setLoading(false));
-  }, [shop, period]);
+  }, [shop, period, authFetch]);
 
   return (
     <div>

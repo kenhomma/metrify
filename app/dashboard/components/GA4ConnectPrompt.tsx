@@ -1,6 +1,7 @@
 'use client';
 
 import { useState } from 'react';
+import { useAuthFetch } from '@/lib/use-auth-fetch';
 
 export default function GA4ConnectPrompt({
   shop,
@@ -13,6 +14,7 @@ export default function GA4ConnectPrompt({
 }) {
   const [propertyIdInput, setPropertyIdInput] = useState('');
   const [saving, setSaving] = useState(false);
+  const authFetch = useAuthFetch();
 
   const handleConnectGA4 = () => {
     const w = 600;
@@ -30,7 +32,7 @@ export default function GA4ConnectPrompt({
     if (!propertyIdInput.trim()) return;
     setSaving(true);
     try {
-      const res = await fetch(
+      const res = await authFetch(
         `/api/ga/property?shop=${encodeURIComponent(shop)}`,
         {
           method: 'POST',

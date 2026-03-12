@@ -3,6 +3,7 @@
 import Link from 'next/link';
 import { usePathname, useSearchParams } from 'next/navigation';
 import { useEffect, useState } from 'react';
+import { useAuthFetch } from '@/lib/use-auth-fetch';
 
 const navItems = [
   { label: 'Shopify', href: '/dashboard/shopify', group: 'shopify' },
@@ -16,16 +17,17 @@ export default function DashboardNav() {
   const searchParams = useSearchParams();
   const shop = searchParams.get('shop') ?? '';
   const [gaConnected, setGaConnected] = useState(false);
+  const authFetch = useAuthFetch();
 
   useEffect(() => {
     if (!shop) return;
-    fetch(`/api/ga/property?shop=${encodeURIComponent(shop)}`)
+    authFetch(`/api/ga/property?shop=${encodeURIComponent(shop)}`)
       .then((res) => res.json())
       .then((data) => {
         if (data.connected && data.propertyId) setGaConnected(true);
       })
       .catch(() => {});
-  }, [shop]);
+  }, [shop, authFetch]);
 
   return (
     <nav className="w-56 bg-white border-r border-gray-200 min-h-screen p-4 shrink-0">

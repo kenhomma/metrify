@@ -1,12 +1,12 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { sql } from '@/lib/db';
 import { getGoogleAccessToken, runGA4Report } from '@/lib/google';
+import { authenticateRequest } from '@/lib/auth';
 
 export async function GET(request: NextRequest) {
-  const shop = request.nextUrl.searchParams.get('shop');
-  if (!shop) {
-    return NextResponse.json({ error: 'Missing shop parameter' }, { status: 400 });
-  }
+  const auth = authenticateRequest(request);
+  if ('error' in auth) return auth.error;
+  const { shop } = auth;
 
   const merchants = await sql`
     SELECT google_refresh_token, ga4_property_id

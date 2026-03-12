@@ -1,12 +1,11 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { sql } from '@/lib/db';
+import { authenticateRequest } from '@/lib/auth';
 
 export async function GET(request: NextRequest) {
-  const shop = request.nextUrl.searchParams.get('shop');
-
-  if (!shop) {
-    return NextResponse.json({ error: 'Missing shop parameter' }, { status: 400 });
-  }
+  const auth = authenticateRequest(request);
+  if ('error' in auth) return auth.error;
+  const { shop } = auth;
 
   const merchants = await sql`
     SELECT shop_domain, access_token FROM merchants WHERE shop_domain = ${shop} LIMIT 1
