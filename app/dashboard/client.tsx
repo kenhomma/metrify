@@ -117,7 +117,7 @@ export default function DashboardClient({
         if (data.error) setGaError(data.error);
         else setGaData(data);
       })
-      .catch(() => setGaError('GA4データの取得に失敗しました'))
+      .catch((err) => setGaError(`GA4データの取得に失敗しました: ${err.message}`))
       .finally(() => setGaLoading(false));
   }, [shop, gaConnected, ga4PropertyId]);
 

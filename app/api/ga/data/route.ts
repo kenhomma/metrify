@@ -6,6 +6,19 @@ function formatGA4Date(raw: string): string {
   return `${raw.slice(0, 4)}-${raw.slice(4, 6)}-${raw.slice(6, 8)}`;
 }
 
+async function safeReport(
+  accessToken: string,
+  propertyId: string,
+  body: object
+): Promise<{ data: any; error: string | null }> {
+  try {
+    const data = await runGA4Report(accessToken, propertyId, body);
+    return { data, error: null };
+  } catch (err: any) {
+    return { data: null, error: err.message };
+  }
+}
+
 export async function GET(request: NextRequest) {
   const shop = request.nextUrl.searchParams.get('shop');
   if (!shop) {
@@ -27,96 +40,112 @@ export async function GET(request: NextRequest) {
     return NextResponse.json({ error: 'GA4 not configured' }, { status: 400 });
   }
 
+  let accessToken: string;
   try {
-    const accessToken = await getGoogleAccessToken(google_refresh_token);
-
-    const endDate = new Date().toISOString().split('T')[0];
-    const startDateObj = new Date();
-    startDateObj.setDate(startDateObj.getDate() - 30);
-    const startDate = startDateObj.toISOString().split('T')[0];
-
-    const [trafficReport, channelReport, ecommerceReport] = await Promise.all([
-      // トラフィック（日次）
-      runGA4Report(accessToken, ga4_property_id, {
-        dateRanges: [{ startDate, endDate }],
-        dimensions: [{ name: 'date' }],
-        metrics: [
-          { name: 'screenPageViews' },
-          { name: 'sessions' },
-          { name: 'activeUsers' },
-        ],
-        orderBys: [{ dimension: { dimensionName: 'date' } }],
-      }),
-
-      // チャネル別
-      runGA4Report(accessToken, ga4_property_id, {
-        dateRanges: [{ startDate, endDate }],
-        dimensions: [{ name: 'sessionDefaultChannelGroup' }],
-        metrics: [
-          { name: 'sessions' },
-          { name: 'activeUsers' },
-        ],
-        orderBys: [{ metric: { metricName: 'sessions' }, desc: true }],
-      }),
-
-      // eコマース（日次）
-      runGA4Report(accessToken, ga4_property_id, {
-        dateRanges: [{ startDate, endDate }],
-        dimensions: [{ name: 'date' }],
-        metrics: [
-          { name: 'ecommercePurchases' },
-          { name: 'purchaseRevenue' },
-        ],
-        orderBys: [{ dimension: { dimensionName: 'date' } }],
-      }),
-    ]);
-
-    const traffic = (trafficReport.rows ?? []).map((row: any) => ({
-      date: formatGA4Date(row.dimensionValues[0].value),
-      pageViews: parseInt(row.metricValues[0].value, 10),
-      sessions: parseInt(row.metricValues[1].value, 10),
-      users: parseInt(row.metricValues[2].value, 10),
-    }));
-
-    const channels = (channelReport.rows ?? []).map((row: any) => ({
-      channel: row.dimensionValues[0].value,
-      sessions: parseInt(row.metricValues[0].value, 10),
-      users: parseInt(row.metricValues[1].value, 10),
-    }));
-
-    const ecommerce = (ecommerceReport.rows ?? []).map((row: any) => ({
-      date: formatGA4Date(row.dimensionValues[0].value),
-      purchases: parseInt(row.metricValues[0].value, 10),
-      revenue: parseFloat(row.metricValues[1].value),
-    }));
-
-    const totalPV = traffic.reduce((s: number, r: any) => s + r.pageViews, 0);
-    const totalSessions = traffic.reduce((s: number, r: any) => s + r.sessions, 0);
-    const totalUsers = traffic.reduce((s: number, r: any) => s + r.users, 0);
-    const totalRevenue = ecommerce.reduce((s: number, r: any) => s + r.revenue, 0);
-    const totalPurchases = ecommerce.reduce((s: number, r: any) => s + r.purchases, 0);
-    const conversionRate = totalSessions > 0
-      ? Math.round((totalPurchases / totalSessions) * 10000) / 100
-      : 0;
-
-    return NextResponse.json({
-      traffic,
-      channels,
-      ecommerce,
-      totals: {
-        pageViews: totalPV,
-        sessions: totalSessions,
-        users: totalUsers,
-        revenue: Math.round(totalRevenue * 100) / 100,
-        purchases: totalPurchases,
-        conversionRate,
-      },
-    });
+    accessToken = await getGoogleAccessToken(google_refresh_token);
   } catch (err: any) {
-    console.error('GA4 data fetch error:', err);
     return NextResponse.json(
-      { error: 'GA4データの取得に失敗しました', details: err.message },
+      { error: `Googleアクセストークンの取得に失敗しました: ${err.message}` },
       { status: 502 }
     );
   }
+
+  const endDate = new Date().toISOString().split('T')[0];
+  const startDateObj = new Date();
+  startDateObj.setDate(startDateObj.getDate() - 30);
+  const startDate = startDateObj.toISOString().split('T')[0];
+
+  const [trafficResult, channelResult, ecommerceResult] = await Promise.all([
+    safeReport(accessToken, ga4_property_id, {
+      dateRanges: [{ startDate, endDate }],
+      dimensions: [{ name: 'date' }],
+      metrics: [
+        { name: 'screenPageViews' },
+        { name: 'sessions' },
+        { name: 'activeUsers' },
+      ],
+      orderBys: [{ dimension: { dimensionName: 'date' } }],
+    }),
+
+    safeReport(accessToken, ga4_property_id, {
+      dateRanges: [{ startDate, endDate }],
+      dimensions: [{ name: 'sessionDefaultChannelGroup' }],
+      metrics: [
+        { name: 'sessions' },
+        { name: 'activeUsers' },
+      ],
+      orderBys: [{ metric: { metricName: 'sessions' }, desc: true }],
+    }),
+
+    safeReport(accessToken, ga4_property_id, {
+      dateRanges: [{ startDate, endDate }],
+      dimensions: [{ name: 'date' }],
+      metrics: [
+        { name: 'ecommercePurchases' },
+        { name: 'purchaseRevenue' },
+      ],
+      orderBys: [{ dimension: { dimensionName: 'date' } }],
+    }),
+  ]);
+
+  // 全レポートが失敗した場合
+  if (trafficResult.error && channelResult.error && ecommerceResult.error) {
+    return NextResponse.json(
+      { error: `GA4データの取得に失敗しました: ${trafficResult.error}` },
+      { status: 502 }
+    );
+  }
+
+  const traffic = trafficResult.data
+    ? (trafficResult.data.rows ?? []).map((row: any) => ({
+        date: formatGA4Date(row.dimensionValues[0].value),
+        pageViews: parseInt(row.metricValues[0].value, 10),
+        sessions: parseInt(row.metricValues[1].value, 10),
+        users: parseInt(row.metricValues[2].value, 10),
+      }))
+    : [];
+
+  const channels = channelResult.data
+    ? (channelResult.data.rows ?? []).map((row: any) => ({
+        channel: row.dimensionValues[0].value,
+        sessions: parseInt(row.metricValues[0].value, 10),
+        users: parseInt(row.metricValues[1].value, 10),
+      }))
+    : [];
+
+  const ecommerce = ecommerceResult.data
+    ? (ecommerceResult.data.rows ?? []).map((row: any) => ({
+        date: formatGA4Date(row.dimensionValues[0].value),
+        purchases: parseInt(row.metricValues[0].value, 10),
+        revenue: parseFloat(row.metricValues[1].value),
+      }))
+    : [];
+
+  const totalPV = traffic.reduce((s: number, r: any) => s + r.pageViews, 0);
+  const totalSessions = traffic.reduce((s: number, r: any) => s + r.sessions, 0);
+  const totalUsers = traffic.reduce((s: number, r: any) => s + r.users, 0);
+  const totalRevenue = ecommerce.reduce((s: number, r: any) => s + r.revenue, 0);
+  const totalPurchases = ecommerce.reduce((s: number, r: any) => s + r.purchases, 0);
+  const conversionRate = totalSessions > 0
+    ? Math.round((totalPurchases / totalSessions) * 10000) / 100
+    : 0;
+
+  return NextResponse.json({
+    traffic,
+    channels,
+    ecommerce,
+    totals: {
+      pageViews: totalPV,
+      sessions: totalSessions,
+      users: totalUsers,
+      revenue: Math.round(totalRevenue * 100) / 100,
+      purchases: totalPurchases,
+      conversionRate,
+    },
+    errors: {
+      traffic: trafficResult.error,
+      channels: channelResult.error,
+      ecommerce: ecommerceResult.error,
+    },
+  });
 }
